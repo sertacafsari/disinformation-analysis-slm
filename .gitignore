@@ -1,3 +1,5 @@
 .venv
 .conda
 .env
+src/saved_models
+src/data
