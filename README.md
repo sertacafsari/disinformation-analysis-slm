@@ -6,6 +6,7 @@
 ## Setting The Environment
 - venv
 - pip - req.
+- module load Python/3.11.5-GCCcore-13.2.0
 
 ## Set Environmental Variables
 
