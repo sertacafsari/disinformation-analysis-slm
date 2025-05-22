@@ -4,7 +4,7 @@
 
 
 ## Setting The Environment
-- conda
+- venv
 - pip - req.
 
 ## Set Environmental Variables
