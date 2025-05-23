@@ -2,4 +2,5 @@
 .conda
 .env
 src/saved_models
-src/data
+data
+src/deneme.py
