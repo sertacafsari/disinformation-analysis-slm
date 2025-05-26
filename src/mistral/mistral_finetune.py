@@ -2,6 +2,7 @@ import torch
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import wandb
 from finetuner import Finetuner
 from dataset_loader import DatasetLoader
 from dotenv import load_dotenv
@@ -32,7 +33,23 @@ LIAR_LABELS = {0: 'pants-fire', 1: 'false', 2: 'barely-true', 3: 'half-true', 4:
 batch_size = 256
 learning_rate = 1e-3 
 epochs = 4
-logging_step = 10
+logging_step = 1
+
+# Initialize the WandB
+wandb.login(key=wb_key)
+wandb.init(
+    entity="sbafsari-rug-university-of-groningen",
+    project="mistral-liar2",
+    name="initial-run1",
+    config={
+        "model": mistral_model,
+        "dataset": "LIAR2",
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "epochs": epochs,
+        "seed": seed
+    }
+)
 
 # Initialize the DatasetLoader
 datasetLoader = DatasetLoader()
@@ -61,14 +78,14 @@ data_collator = DataCollatorWithPadding(
 
 # Set the DataLoaders for train and validation data
 train_dataloader = DataLoader(
-    tokenized_dataset["train"][10],
+    tokenized_dataset["train"],
     batch_size=batch_size,
     shuffle=True,
     collate_fn=data_collator,
 )
 
 val_dataloader = DataLoader(
-    tokenized_dataset["validation"][3],
+    tokenized_dataset["validation"],
     batch_size=batch_size,
     shuffle=False,
     collate_fn=data_collator
@@ -98,11 +115,13 @@ finetuner = Finetuner(
     lr=learning_rate
 )
 
+wandb.watch(model, log="all", log_freq=logging_step)
+
+print("Fine tuning is starting...\n")
+
 # Finetune the model
-result = finetuner.train(device=device, epochs=epochs, logging_step=logging_step, best_model_path=best_model_save_path)
+result = finetuner.train(device=device, epochs=epochs, logging_step=logging_step, best_model_path=best_model_save_path, wandb_run=wandb)
 
 # Print train losses
 print(f"Training Losses: {result['train_loss']} \n")
 print(f"Validation Losses: {result['val_loss']} \n")
-
-

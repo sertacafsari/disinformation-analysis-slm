@@ -23,7 +23,7 @@ class Finetuner():
         self.val_dataloader = val_dataloader
         self.optimizer = AdamW(self.model.parameters(), lr=lr)
     
-    def train(self, device: torch.device, epochs:int=1, logging_step:int=10, best_model_path:str=None):
+    def train(self, device: torch.device, epochs:int=1, logging_step:int=10, best_model_path:str=None, wandb_run=None):
         # Transfer model to GPU (or back to CPU)
         self.model.to(device)
         
@@ -36,6 +36,8 @@ class Finetuner():
         for epoch in range(epochs):
 
             print(f"Epoch {epoch+1}/{epochs}")
+            if wandb_run:
+                wandb_run.log({"epoch": epoch+1}, step=epoch+1)
 
             # Set the model's mode to "training"
             self.model.train()
@@ -77,9 +79,20 @@ class Finetuner():
                 # Log the progress
                 if ((batch_idx + 1) % logging_step == 0):
                     print(f" Epoch {epoch+1}, Step {batch_idx+1}/{steps_in_epoch}, Loss: {loss}")
+                    if wandb_run:
+                        wandb_run.log(
+                            {
+                                "train/loss": loss,
+                                "train/epoch_step": batch_idx+1,
+                            },
+                            step=epoch * steps_in_epoch + batch_idx + 1,
+                        )
                 
             avg_train = epoch_train_loss / steps_in_epoch
             train_losses.append(avg_train)
+
+            if wandb_run:
+                wandb_run.log({"train/avg_loss": avg_train}, step=(epoch+1)*steps_in_epoch)
             
             # Set the model's mode to "eval"
             self.model.eval()
@@ -108,6 +121,8 @@ class Finetuner():
             average_eval_loss = total_eval_loss/steps_in_eval
 
             val_losses.append(average_eval_loss)
+            if wandb_run:
+                wandb_run.log({"validation/loss": average_eval_loss}, step=(epoch+1)*steps_in_epoch)
 
             # Save the model 
             if best_model_path and average_eval_loss < best_eval_loss:
