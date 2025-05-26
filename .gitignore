@@ -1,6 +1,6 @@
 .venv
-.conda
 .env
-src/saved_models
-data
+src/__pycache__/
+__pycache__
 src/deneme.py
+src/text_models/DENEME.PY
