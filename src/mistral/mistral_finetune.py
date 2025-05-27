@@ -104,6 +104,8 @@ model = MistralForSequenceClassification.from_pretrained(mistral_model)
 
 model.resize_token_embeddings(len(tokenizer))
 
+model.gradient_checkpointing_enable()
+
 print("Model is loaded, finetuning will be start soon...\n")
 
 # Initialize a Finetuner
