@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --partition=gpu
 #SBATCH --job-name=mistral_initial_run
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --output=mistral_initial_run_%j.out
 #SBATCH --error=mistral_initial_run_%j.err
-#SBATCH --gres=gpu:a100:2
+#SBATCH --gres=gpu:v100:2
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=10
-#SBATCH --mem=60G
+#SBATCH --mem=20G
 
 cd "$SLURM_SUBMIT_DIR"
 
@@ -23,10 +23,9 @@ export MASTER_PORT=$((29500 + SLURM_PROCID))
 torchrun \
   --nproc_per_node=$SLURM_NTASKS_PER_NODE \
   --master_port=$MASTER_PORT \
-  src/mistral/mistral_finetune.py \
+  src/roberta/roberta_finetune.py \
     --run_name initial-run1 \
-    --batch_size 128\
-    --gradient_checkpointing
+    --batch_size 32
 
 deactivate
 

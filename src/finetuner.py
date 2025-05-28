@@ -14,19 +14,15 @@ class Finetuner():
         val_dataloader(DataLoader):
     """
 
-    def __init__(self, train_dataloader: DataLoader=None, val_dataloader:DataLoader=None,  model:Module=None, seed:int=1234, lr:float=0.0):
-        self.seed = seed
-        set_seed(self.seed)
-
+    def __init__(self, train_dataloader: DataLoader=None, val_dataloader:DataLoader=None,  model:Module=None, lr:float=0.0):
+        # self.model = torch.compile(model)
         self.model = model
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.optimizer = AdamW(self.model.parameters(), lr=lr)
+
     
     def train(self, device: torch.device, epochs:int=1, logging_step:int=10, best_model_path:str=None, wandb_run=None):
-        # Transfer model to GPU (or back to CPU)
-        self.model.to(device)
-        
         # A variable to store the least validation loss (or best evaluation loss)
         # Set to infinity as we want to have the least one
         best_eval_loss = float('inf')
@@ -35,15 +31,20 @@ class Finetuner():
         
         for epoch in range(epochs):
 
-            print(f"Epoch {epoch+1}/{epochs}")
             if wandb_run:
-                wandb_run.log({"epoch": epoch+1}, step=epoch+1)
+                wandb_run.log({"epoch": epoch+1})
+            else:
+                print(f"Epoch {epoch+1}/{epochs}")
+
 
             # Set the model's mode to "training"
             self.model.train()
 
             steps_in_epoch = len(self.train_dataloader)
             epoch_train_loss = 0.0
+
+            # Set the accuracy
+            acc = 0
 
             for batch_idx, batch_dict in enumerate(self.train_dataloader):
 
@@ -56,12 +57,17 @@ class Finetuner():
                 labels = labels.to(device)
                 input_ids = input_ids.to(device)
                 attention_mask = attention_mask.to(device)
-
+  
                 # Get output
                 output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
 
                 # Get the loss
                 loss = output["loss"]
+
+                # Accuracy calculation
+                logits = output["logits"]
+                preds = logits.argmax(dim=1)
+                acc += (((preds == labels).float().sum()) / (labels.size(0))).item()
 
                 # Empty the gradients accumulated in the optimizer
                 self.optimizer.zero_grad()
@@ -76,23 +82,27 @@ class Finetuner():
                 loss = loss.item()
                 epoch_train_loss += loss
 
-                # Log the progress
+                # Log train step
                 if ((batch_idx + 1) % logging_step == 0):
-                    print(f" Epoch {epoch+1}, Step {batch_idx+1}/{steps_in_epoch}, Loss: {loss}")
                     if wandb_run:
                         wandb_run.log(
                             {
-                                "train/loss": loss,
-                                "train/epoch_step": batch_idx+1,
-                            },
-                            step=epoch * steps_in_epoch + batch_idx + 1,
-                        )
+                                "training_loss": loss,
+                            })
+                    else:
+                        print(f" Epoch {epoch+1}, Step {batch_idx+1}/{steps_in_epoch}, Loss: {loss}")
+
                 
             avg_train = epoch_train_loss / steps_in_epoch
             train_losses.append(avg_train)
 
+            # Log train epoch
             if wandb_run:
-                wandb_run.log({"train/avg_loss": avg_train}, step=(epoch+1)*steps_in_epoch)
+                wandb_run.log({
+                    "train_avg_loss": avg_train,
+                    "train_accuracy": (acc * 100) / steps_in_epoch,
+                    "epoch": epoch
+                    })
             
             # Set the model's mode to "eval"
             self.model.eval()
@@ -100,9 +110,11 @@ class Finetuner():
             total_eval_loss = 0
             steps_in_eval = len(self.val_dataloader)
 
+            acc = 0
+
             # We wont use backprop and change weights during validation/inference
             with torch.no_grad():
-                for batch_dict in self.val_dataloader:
+                for batch_idx, batch_dict in enumerate(self.val_dataloader):
 
                     labels = batch_dict["labels"]
                     input_ids = batch_dict["input_ids"]
@@ -116,13 +128,38 @@ class Finetuner():
 
                     loss = output["loss"]
 
+                    # Accuracy Calculation
+                    logits = output["logits"]
+                    preds = logits.argmax(dim=1)
+                    acc += (((preds == labels).float().sum()) / (labels.size(0))).item()
+                    
+
                     total_eval_loss += loss.item()
+
+                    # Log validation step
+                    if ((batch_idx + 1) % logging_step == 0):
+                        if wandb_run:
+                            wandb_run.log(
+                                {
+                                    "validation_loss": loss,
+                                })
+                        else:
+                            print(f" Epoch {epoch+1}, Step {batch_idx+1}/{steps_in_epoch}, Loss: {loss}")
+
+                
 
             average_eval_loss = total_eval_loss/steps_in_eval
 
             val_losses.append(average_eval_loss)
+
+            # Log validation step loss
             if wandb_run:
-                wandb_run.log({"validation/loss": average_eval_loss}, step=(epoch+1)*steps_in_epoch)
+                wandb_run.log({
+                    "validation_loss": average_eval_loss,
+                    "val_accuracy": (acc * 100) / steps_in_eval,
+                    "epoch": epoch
+
+                })
 
             # Save the model 
             if best_model_path and average_eval_loss < best_eval_loss:
