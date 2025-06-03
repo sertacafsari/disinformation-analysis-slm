@@ -4,8 +4,8 @@
 #SBATCH --time=04:00:00
 #SBATCH --output=mistral_initial_run_%j.out
 #SBATCH --error=mistral_initial_run_%j.err
-#SBATCH --gres=gpu:v100:2
-#SBATCH --ntasks-per-node=2
+#SBATCH --gres=gpu:v100:1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=20G
 
@@ -24,8 +24,8 @@ torchrun \
   --nproc_per_node=$SLURM_NTASKS_PER_NODE \
   --master_port=$MASTER_PORT \
   src/roberta/roberta_finetune.py \
-    --run_name initial-run1 \
-    --batch_size 32
+    --run_name roberta-runs-sweeping \
+    --batch_size 64
 
 deactivate
 
