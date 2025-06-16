@@ -25,9 +25,9 @@ class Finetuner():
         if model.base_model_prefix == "roberta":
             # Using weight decay to penalize large weights, standard 0.01 for AdamW in Roberta
             self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.01)
-        
+       
+        self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.1)
 
-    
     def train(self, device: torch.device, epochs:int=1, logging_step:int=10, best_model_path:str=None, wandb_run=None, k_top:int=2):
         # A variable to store the least validation loss (or best evaluation loss)
         # Set to infinity as we want to have the least one
@@ -59,7 +59,7 @@ class Finetuner():
             # Set the accuracy
             top_k_accuracy = 0
 
-            # acc = 0
+            acc = 0
 
             progress_traindataloader = tqdm(self.train_dataloader, desc="Training", total=len(self.train_dataloader))
 
@@ -80,7 +80,7 @@ class Finetuner():
 
                 # Top-1 Accuracy
                 preds = logits.argmax(dim=1)
-                # acc += (((preds == labels).float().sum()) / (labels.size(0))).item()
+                acc += (((preds == labels).float().sum()) / (labels.size(0))).item()
 
                 # Top-k Accuracy
                 _, top_k_indices = torch.topk(logits,k_top, dim=1)
@@ -96,6 +96,7 @@ class Finetuner():
 
                 # Empty the gradients accumulated in the optimizer
                 self.optimizer.zero_grad()
+
 
                 # Apply the backpropagation
                 loss.backward()
@@ -127,12 +128,13 @@ class Finetuner():
 
             train_macro_f1 = f1_score(train_labels, train_preds,average="macro")
 
-            # Log train epoch => "train_accuracy": (acc * 100) / steps_in_epoch,
+            # Log train epoch
             if wandb_run:
                 wandb_run.log({
                     "train_avg_loss": avg_train,
                     "train_macro_f1": train_macro_f1,
                     "train_top_k_acc": (top_k_accuracy * 100)/steps_in_epoch,
+                    "train_accuracy": (acc * 100) / steps_in_epoch,
                     "epoch": epoch
                     })
             
@@ -143,6 +145,8 @@ class Finetuner():
             steps_in_eval = len(self.val_dataloader)
 
             val_top_k_accuracy = 0
+
+            acc = 0
 
             progress_val = tqdm(self.val_dataloader, desc="Validation", total=len(self.val_dataloader))
 
@@ -168,7 +172,7 @@ class Finetuner():
                     logits = output["logits"]
                     preds = logits.argmax(dim=1)
 
-                    # acc += (((preds == labels).float().sum()) / (labels.size(0))).item()
+                    acc += (((preds == labels).float().sum()) / (labels.size(0))).item()
 
                     # Validation top-k accuracy
 
@@ -203,11 +207,12 @@ class Finetuner():
 
             val_macro_f1 = f1_score(val_labels, val_preds, average="macro")
 
-            # Log validation step loss => "val_accuracy": (acc * 100) / steps_in_eval
+            # Log validation step loss
             if wandb_run:
                 wandb_run.log({
                     "val_avg_loss": average_eval_loss,
                     "val_top_k_accuracy": (val_top_k_accuracy * 100) / steps_in_eval,
+                    "val_accuracy": (acc * 100) / steps_in_eval,
                     "val_macro_f1": val_macro_f1,
                     "epoch": epoch
 
@@ -228,71 +233,6 @@ class Finetuner():
 
             
         return {"train_loss": train_losses,"val_loss": val_losses}
-    
-    def test_model(self, device: torch.device, test_dataloader:DataLoader, model_path:str, logging_step:int=10, wandb_run=None, k_top:int=2):
-
-        if model_path is None:
-            print("Model path is wrong")
-        
-        # Load the saved model
-        self.model.load_state_dict(torch.load(model_path, map_location=device))
-
-        self.model.to(device)
-
-        self.model.eval()
-
-        total_test_loss = 0
-        test_preds = []
-        test_labels = []
-        test_top_k_acc = 0
-
-        progress_testloader = tqdm(test_dataloader, desc="Testing", total=len(test_dataloader))
-
-        with torch.no_grad():
-            for batch_idx, batch_dict in enumerate(progress_testloader):
-
-                labels = batch_dict["labels"].to(device)
-                input_ids = batch_dict["input_ids"].to(device)
-                attention_mask = batch_dict["attention_mask"].to(device)
-
-                output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-
-                loss = output["loss"]
-
-                total_test_loss += loss.item()
-
-                # Accuracy Calculation
-                logits = output["logits"]
-                preds = logits.argmax(dim=1)
-                test_preds.extend(preds.cpu().numpy())
-                test_labels.extend(labels.cpu().numpy())
-
-                # Top-k Accuracy
-                _, top_k_indices_test = torch.topk(logits, k=k_top, dim=1)
-                labels_expanded_test = labels.unsqueeze(1).expand_as(top_k_indices_test)
-
-                top_k_correct_test = (top_k_indices_test == labels_expanded_test).any(dim=1).float().sum()
-                batch_top_k_acc_test = top_k_correct_test / labels.size(0)
-                test_top_k_acc += batch_top_k_acc_test.item()
-                # Log validation step
-                if ((batch_idx + 1) % logging_step == 0):
-                    if wandb_run:
-                        wandb_run.log(
-                            {
-                                "test_loss": loss,
-                            })
-                
-            avg_test_loss = total_test_loss/len(test_dataloader)
-            final_top_k_accuracy = (test_top_k_acc * 100) / len(test_dataloader)
-            test_f1_macro = f1_score(test_labels, test_preds, average="macro")
-
-            if wandb_run:
-                wandb_run.log({
-                    "test_avg_loss": avg_test_loss,
-                    "test_top_k_accuracy": final_top_k_accuracy,
-                    "test_macro_f1": test_f1_macro
-                })
-
 
 
 

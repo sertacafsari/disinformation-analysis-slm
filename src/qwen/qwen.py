@@ -10,7 +10,7 @@ from tester import Tester
 from dataset_loader import DatasetLoader
 from dotenv import load_dotenv
 from huggingface_hub import login
-from transformers import RobertaForSequenceClassification, DataCollatorWithPadding, RobertaConfig
+from transformers import DataCollatorWithPadding, AutoConfig, AutoModelForSequenceClassification
 from torch.utils.data import DataLoader
 
 
@@ -21,7 +21,7 @@ wb_key = os.getenv("WB_TOKEN")
 login(token=hf_key)
 
 # Set the global variables
-seed = 326
+seed = 184
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -35,15 +35,16 @@ set_seed(seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {device}")
 
-roberta = "FacebookAI/roberta-base"
+qwen = "Qwen/Qwen3-0.6B"
 dataset_name = "chengxuphd/liar2"
-best_model_save_path = f"./data/models/roberta_liar2/best.pt" #TODO: Make it dynamic
+best_model_save_path = f"./data/models/qwen_liar2/best.pt" #TODO: Make it dynamic
 save_raw_data_path = f"../data/datasets/liar2/"
-save_tokenized_data_path = f"../data/tokenized_datasets/liar2_roberta/"
+save_tokenized_data_path = f"../data/tokenized_datasets/liar2_qwen/"
 
 LIAR_LABELS = {0: 'pants-fire', 1: 'false', 2: 'barely-true', 3: 'half-true', 4: 'mostly-true', 5: 'true'}
 
 batch_size = 32
+# learning_rate = 1e-5
 epochs = 5
 logging_step = 1
 
@@ -63,7 +64,7 @@ datasetLoader.loadDatasetFromHuggingFace(dataset_name,
                                          json=True)
 
 # Tokenize the dataset and save
-tokenized_dataset, tokenizer = datasetLoader.tokenizeDatasetAndSave(model_name=roberta,
+tokenized_dataset, tokenizer = datasetLoader.tokenizeDatasetAndSave(model_name=qwen,
                                      finetune_column="statement",
                                      batch_size=batch_size,
                                      save_data=False,
@@ -105,17 +106,22 @@ test_dataloader = DataLoader(
 
 print("Fine tuning will start soon")
 
-# Set a Config for Roberta Model
-conf = RobertaConfig.from_pretrained(roberta)
+# Set a Config for qwen Model
+conf = AutoConfig.from_pretrained(qwen)
 conf.num_labels = len(LIAR_LABELS)
+conf.pad_token_id = tokenizer.pad_token_id
 
-# # NOTE: SWEEPING EXPERIMENT
-learning_rates = [2e-5]
+# # NOTE: SWEEPING EXPERIMENT -> 1e-5c, 5e-4, 1e-4c, 5e-3c, 5e-6
+learning_rates = [5e-6]
 
 for lr in learning_rates:
 
     # Initialize the model with config
-    model = RobertaForSequenceClassification.from_pretrained(roberta, config=conf)
+    model = AutoModelForSequenceClassification.from_pretrained(qwen, config=conf)
+    
+    model.resize_token_embeddings(len(tokenizer))
+
+    model.config.vocab_size = len(tokenizer)
 
     print("Model is loaded\n")
 
@@ -128,9 +134,9 @@ for lr in learning_rates:
     wandb.init(
         entity="sbafsari-rug-university-of-groningen",
         project="disinformation-slm",
-        name=f"roberta-{batch_size}-{lr}-last-run-3",
+        name=f"qwen-{batch_size}-{lr}-run",
         config={
-            "model": roberta,
+            "model": qwen,
             "dataset": "LIAR2",
             "batch_size": batch_size,
             "learning_rate": lr,
@@ -139,7 +145,7 @@ for lr in learning_rates:
         }
     )
 
-    best_model_save_path = f"./data/models/roberta_liar2/roberta_{batch_size}_{lr}-last-3.pt"
+    best_model_save_path = f"./data/models/qwen/qwen_{batch_size}_{lr}.pt"
 
     # Initialize a Finetuner
     finetuner = Finetuner(
@@ -158,7 +164,6 @@ for lr in learning_rates:
     print(f"Training Losses: {result['train_loss']} \n")
     print(f"Validation Losses: {result['val_loss']} \n")
 
-    # Load the best model's weights
     model.load_state_dict(torch.load(best_model_save_path, map_location=device))
 
     # Test the model

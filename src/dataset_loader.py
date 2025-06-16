@@ -82,8 +82,12 @@ class DatasetLoader:
         def tokenize(batch:str):
             return tokenizer(batch[finetune_column], padding=True, truncation=True)
 
+        # labels, input_ids attention_mask 
+
         # Set the tokenized dataset as self.dataset which will include input_ids, attention_mask and labels
         self.dataset = self.dataset.map(tokenize, batched=True, batch_size=batch_size, remove_columns=[col for col in self.dataset["train"].column_names if col != "labels"])
+
+        import code; code.interact(local=locals())
 
         print("The data is tokenized and replaced as main dataset!\n")
 
@@ -107,4 +111,4 @@ if __name__ == "__main__":
 
     loadData.loadDatasetFromHuggingFace("chengxuphd/liar2", save_data=True, save_data_path="../data/deneme", json=True)
 
-    tokenized_dataset = loadData.tokenizeDatasetAndSave("mistralai/Mistral-7B-v0.1", "statement", 32, save_data=True, save_data_path="../data/tokenized")
+    tokenized_dataset = loadData.tokenizeDatasetAndSave("FacebookAI/roberta-base", "statement", 32, save_data=True, save_data_path="../data/tokenized")

@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --partition=gpu
-#SBATCH --job-name=phi-run
-#SBATCH --time=00:01:00
-#SBATCH --output=phi_sweep_run_%j.out
-#SBATCH --error=phi_sweep_run_%j.err
-#SBATCH --gres=gpu:a100:1
+#SBATCH --job-name=smol-run
+#SBATCH --time=13:00:00
+#SBATCH --output=smol_run%j.out
+#SBATCH --error=smol_run%j.err
+#SBATCH --gres=gpu:v100:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=20G
@@ -23,8 +23,8 @@ export MASTER_PORT=$((29500 + SLURM_PROCID))
 torchrun \
   --nproc_per_node=$SLURM_NTASKS_PER_NODE \
   --master_port=$MASTER_PORT \
-  src/main.py \
-    # --run_name phi-runs-sweeping \
-    # --batch_size 64
+  src/smollm/smol.py \
+    --run_name smol-liar-run \
+    --batch_size 64
 
 deactivate
