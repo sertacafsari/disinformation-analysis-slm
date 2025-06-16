@@ -6,6 +6,4 @@ src/deneme.py
 src/text_models/DENEME.PY
 wandb
 habrok-output/
-data/
-qwen_run17928057.err
-qwen_run17928057.out
+data

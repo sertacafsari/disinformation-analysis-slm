@@ -25,8 +25,8 @@ class Finetuner():
         if model.base_model_prefix == "roberta":
             # Using weight decay to penalize large weights, standard 0.01 for AdamW in Roberta
             self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.01)
-       
-        self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.1)
+        else:
+            self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.1)
 
     def train(self, device: torch.device, epochs:int=1, logging_step:int=10, best_model_path:str=None, wandb_run=None, k_top:int=2):
         # A variable to store the least validation loss (or best evaluation loss)

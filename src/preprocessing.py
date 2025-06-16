@@ -2,7 +2,7 @@ import json
 import csv
 import os
 import re
-from datasets import load_dataset
+from datasets import load_dataset, Dataset, DatasetDict, ClassLabel, Image
 from huggingface_hub import login
 from dotenv import load_dotenv
 
@@ -39,10 +39,46 @@ def cleanFaux():
 
     with open("./data/datasets/faux/snopes_processed.json", 'w', encoding='utf-8') as json_f:
         json.dump(snopes_json, json_f, indent=2, ensure_ascii=False)
-     
-    # Return 395 Reuters data, and 838 Snopes data
-    return reuters_json, snopes_json
+    
+    # Combine the 395 Reuters data and 838 Snopes data
+    combined_data = reuters_json + snopes_json
 
+    # Generate a Huggingface data
+    hf_data = Dataset.from_list(combined_data)
+
+    # Tell the img_main contains image paths
+    hf_data = hf_data.cast_column("img_main", Image())
+
+    # Get class labels
+    unique_labels = sorted(hf_data.unique("label"))
+    class_labels = ClassLabel(names=unique_labels)
+
+    # Split the dataset into training, test
+    train_test_set = hf_data.train_test_split(test_size=0.4, seed=42)
+    train_data = train_test_set["train"]
+
+    # Split test to validation and test splits
+    test_validation_set = train_test_set["test"]
+
+    val_test = test_validation_set.train_test_split(test_size=0.5,seed=42)
+    validation_data = val_test["train"]
+    test_data = val_test["test"]
+
+    # Generate a final dataset
+    final_data = DatasetDict(
+        {
+            "train": train_data,
+            "validation": validation_data,
+            "test": test_data
+        }
+    ).cast_column("label", class_labels)
+
+    final_data.save_to_disk("./data/datasets/faux/")
+    final_data["train"].to_json("./data/datasets/faux/train_processed.json")
+    final_data["validation"].to_json("./data/datasets/faux/validation_processed.json")
+    final_data["test"].to_json("./data/datasets/faux/test_processed.json")
+
+    return final_data
 
 
 def cleanArgilla():
@@ -78,7 +114,6 @@ def cleanArgilla():
         # Ensure prediction is removed
         if 'prediction' in item:
             del item['prediction']
-
         cleaned_data.append(item)
     
     # Delete the first data entry as it is null
@@ -88,9 +123,39 @@ def cleanArgilla():
     with open("./data/datasets/argilla/argilla_processed.json", "w", encoding='utf-8') as f:
         json.dump(cleaned_data, f, indent=2, ensure_ascii=False)
 
+    hf_data = Dataset.from_list(cleaned_data)
 
-    return cleaned_data
+    unique_labels = sorted(hf_data.unique("label"))
+
+    class_labels = ClassLabel(names=unique_labels)
+
+    # Split the dataset into training, test
+    train_test_set = hf_data.train_test_split(test_size=0.4, seed=42)
+    train_data = train_test_set["train"]
+
+    # Split test to validation and test splits
+    test_validation_set = train_test_set["test"]
+
+    val_test = test_validation_set.train_test_split(test_size=0.5,seed=42)
+    validation_data = val_test["train"]
+    test_data = val_test["test"]
+
+    # Combine the data
+    final_data = DatasetDict(
+        {
+            "train": train_data,
+            "validation": validation_data,
+            "test": test_data
+        }
+    ).cast_column("label", class_labels)
+
+    final_data.save_to_disk("./data/datasets/argilla/")
+    final_data["train"].to_json("./data/datasets/argilla/train_processed.json")
+    final_data["validation"].to_json("./data/datasets/argilla/validation_processed.json")
+    final_data["test"].to_json("./data/datasets/argilla/test_processed.json")
+
+    return final_data
 
 if __name__ == "__main__":
-    r,s = cleanFaux()
+    faux = cleanFaux()
     argilla = cleanArgilla()
