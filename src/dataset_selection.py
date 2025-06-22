@@ -1,7 +1,29 @@
 import os
 import json
-from datasets import load_dataset, load_from_disk
-from transformers import AutoTokenizer, AutoProcessor, default_data_collator, DataCollatorWithPadding
+from datasets import load_dataset, load_from_disk, Image
+from transformers import AutoTokenizer, AutoProcessor, DataCollatorWithPadding
+from data_collator_vision import DataCollatorVision
+
+def getTextModel(model_name:str):
+    """ Returns the real name of the given model name"""
+    if model_name == "roberta":
+        return "FacebookAI/roberta-base"
+    elif model_name == "smol":
+        return "HuggingFaceTB/SmolLM2-360M"
+    elif model_name == "qwen":
+        return "Qwen/Qwen3-0.6B"
+    raise ValueError("No model is provided!")
+        
+def getVisionModel(model_name:str):
+    """ Returns the real name of the given model name"""
+    if model_name == "qwen":
+        return "Qwen/Qwen2.5-VL-3B-Instruct"
+    elif model_name == "microsoft":
+        return "microsoft/Florence-2-base"
+    elif model_name == "smol":
+        return "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+    raise ValueError("No model or wrong model is provided for vision models")
+
 
 def changeLabelColumn(data):
     """ Changes the label column in the data to labels """
@@ -49,7 +71,7 @@ def getData(dataset_name:str):
             dataset_name = "argilla"
             train_column = "text"
             data = load_from_disk("./data/datasets/argilla")
-        # If the name is faux TODO: TRAIN COLUMN
+        # If the name is faux
         elif dataset_name == "faux":
             dataset_name = "faux"
             train_column = "claim"
@@ -65,9 +87,12 @@ def getData(dataset_name:str):
 
 class DatasetSelection():
 
-    def __init__(self, dataset_name:str, model_name:str, batch_size:int):
+    def __init__(self, dataset_name:str, model_name:str, batch_size:int, model_type:str):
         self.data, self.dataset_name, self.train_column = getData(dataset_name)
-        self.model_name = model_name
+        if model_type == "text":
+            self.model_name = getTextModel(model_name)
+        else:
+            self.model_name = getVisionModel(model_name)
         self.batch_size = batch_size
     
     def __tokenizeTextData(self):
@@ -107,16 +132,30 @@ class DatasetSelection():
     def __processVisualData(self):
 
         # Loads processor that includes a tokenizer for text and image processor
-        processor = AutoProcessor.from_pretrained(self.model_name)
+        processor = AutoProcessor.from_pretrained(self.model_name, trust_remote_code=True)
+
+        self.data = self.data.cast_column("img_main", Image())
 
         def process(batch):
-            return processor(text=batch["claim"], images=batch["img_main"], return_tensors="pt", padding=True, truncation=True)
+            text_inputs = processor.tokenizer(batch["claim"], truncation=True)
+            final_inputs = {
+                'input_ids': text_inputs['input_ids'],
+                'attention_mask': text_inputs['attention_mask'],
+                'pixel_values': batch["img_main"]
+            }
+            return final_inputs
         
-        self.data = self.data.map(process, batched=True, remove_columns=[col for col in self.data["train"].column_names if col != "labels"])
+        self.data = self.data.map(process,remove_columns=["img_main", "claim"])
+        self.data.set_format(
+            type="torch",
+            columns=["input_ids", "attention_mask", "pixel_values", "labels"],
+        )
 
         print("Multimodal dataset is processed!")
 
-        return self.data, processor, default_data_collator
+        data_col = DataCollatorVision(processor)
+        
+        return self.data, processor, data_col
     
     def selectDataset(self):
         if self.dataset_name in ["chengxuphd/liar2", "argilla"]:

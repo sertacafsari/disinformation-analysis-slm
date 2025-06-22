@@ -1,29 +1,27 @@
-from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoConfig, AutoModelForSequenceClassification
+from classification import QwenVisionModelWithClassification, SmolVisionModel
+from torch.nn import Linear
+import torch
 
 def getTextModel(model_name:str):
     """ Returns the real name of the given model name"""
     if model_name == "roberta":
-        model_name = "FacebookAI/roberta-base"
+        return "FacebookAI/roberta-base"
     elif model_name == "smol":
-        model_name = "HuggingFaceTB/SmolLM2-360M"
+        return "HuggingFaceTB/SmolLM2-360M"
     elif model_name == "qwen":
-        model_name = "Qwen/Qwen3-0.6B"
-    else:
-        raise ValueError("No model is provided!")
-    
-    return model_name
-    
+        return "Qwen/Qwen3-0.6B"
+    raise ValueError("No model is provided!")
+        
 def getVisionModel(model_name:str):
     """ Returns the real name of the given model name"""
     if model_name == "qwen":
-        model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
+        return "Qwen/Qwen2.5-VL-3B-Instruct"
     elif model_name == "microsoft":
-        model_name = "microsoft/Florence-2-base"
-    elif model_name == "aya":
-        model_name = "CohereLabs/aya-vision-8b"
-    else:
-        raise ValueError("No model or wrong model is provided for vision models")
-    return model_name
+        return "microsoft/Florence-2-base"
+    elif model_name == "smol":
+        return "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+    raise ValueError("No model or wrong model is provided for vision models")
 
 class ModelSelection():
 
@@ -101,19 +99,46 @@ class ModelSelection():
 
         return model
     
-    # TODO
-    def __configVisionQwen():
+    def __configVisionQwen(self):
         """ Config the Qwen2.5-VL model to desired and return it""" 
-        pass
+
+        # Config
+        self.config.num_labels = 3
+        self.config.id2label = {0: "true", 1: "false", 2: "mixed"}
+        self.config.label2id = {"true":0, "false": 1, "mixed":2}
+        self.config.use_cache = False
+
+        if self.tokenizer.tokenizer.pad_token_id is not None:
+            self.config.pad_token_id = self.tokenizer.tokenizer.pad_token_id
+        
+        model = QwenVisionModelWithClassification.from_pretrained(self.model_name, config=self.config, torch_dtype=torch.bfloat16)
+
+        model.vision_language_model.resize_token_embeddings(len(self.tokenizer.tokenizer))
+
+        return model
+
+        
 
     # TODO
     def __configFlorence():
         pass
 
-    # TODO
-    def __configAya():
-        pass
+    def __configVisionSmol(self):
+        """ Config the SmolLM2-VL model to desired and return it""" 
+        # Config
+        self.config.num_labels = 3
+        self.config.id2label = {0: "true", 1: "false", 2: "mixed"}
+        self.config.label2id = {"true":0, "false": 1, "mixed":2}
+        self.config.use_cache = False
 
+        if self.tokenizer.tokenizer.pad_token_id is not None:
+            self.config.pad_token_id = self.tokenizer.tokenizer.pad_token_id
+        
+        model = SmolVisionModel.from_pretrained(self.model_name, config=self.config, torch_dtype=torch.bfloat16)
+
+        model.vision_language_model.resize_token_embeddings(len(self.tokenizer.tokenizer))
+
+        return model
     def selectLanguageModel(self):
         """ Returns the language model with the selected config"""
         if self.type == "text":
@@ -127,10 +152,10 @@ class ModelSelection():
         elif self.type == "vision":
             if "Qwen" in self.model_name:
                 return self.__configVisionQwen()
-            elif "aya" in self.model_name:
-                return self.__configAya()
+            elif "Smol" in self.model_name:
+                return self.__configVisionSmol()
             elif "Florence" in self.model_name:
-                return self.__configFlorence
+                return self.__configFlorence()
             raise ValueError("No vision model is inputted!")
         else:
             raise ValueError("The model type is invalid!")

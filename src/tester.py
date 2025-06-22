@@ -101,4 +101,69 @@ class Tester:
                     "test_f1_macro": f1_macro
                 })
     
-    #TODO: An additional function to cross domain test could be written
+    def testArgilla(self):
+
+        self.model.to(self.device)
+
+        # Turn on the evaluation mode of the model
+        self.model.eval()
+
+        # Set the step size
+        step_size = len(self.data)
+
+        progress_tracker = tqdm(self.data, desc="Testing", total=step_size)
+
+        # Set the variables for calculations
+        total_loss = 0
+        accuracy = 0
+        f1_macro = 0
+        test_pred, test_labels = [], []
+
+        with torch.no_grad():
+
+            for batch_idx, batch_dict in enumerate(progress_tracker):
+
+                labels = batch_dict["labels"].to(self.device)
+                input_ids = batch_dict["input_ids"].to(self.device)
+                attention_mask = batch_dict["attention_mask"].to(self.device)
+
+                output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+
+                step_loss = output["loss"].item()
+
+                step_logits = output["logits"]
+
+                predicted_liar_class = step_logits.argmax(dim=1)
+
+                argilla_predictions = torch.where(predicted_liar_class<= 2,0,1)
+
+                accuracy += (((argilla_predictions == labels).float().sum()) / (labels.size(0))).item()
+
+                test_pred.extend(argilla_predictions.cpu().tolist())
+                test_labels.extend(labels.cpu().tolist())
+
+                del output, step_logits, predicted_liar_class, argilla_predictions
+                torch.cuda.empty_cache()
+
+
+                total_loss += step_loss
+
+                if ((batch_idx + 1) % self.logging_step == 0):
+                    self.wandb.log(
+                        {
+                            "test_step_loss": step_loss,
+                    })
+
+            avg_loss = total_loss / step_size
+            avg_accuracy = accuracy / step_size
+            f1_macro = f1_score(test_labels, test_pred, average="macro")
+
+            self.wandb.log({
+                "average_test_loss": avg_loss,
+                "average_test_accuracy": avg_accuracy,
+                "test_f1_macro": f1_macro
+            })
+                
+
+
+

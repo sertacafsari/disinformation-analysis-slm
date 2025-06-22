@@ -2,9 +2,13 @@ import json
 import csv
 import os
 import re
-from datasets import load_dataset, Dataset, DatasetDict, ClassLabel, Image
+from datasets import load_dataset, Dataset, DatasetDict, ClassLabel
 from huggingface_hub import login
 from dotenv import load_dotenv
+import requests
+from io import BytesIO
+from PIL import Image as PILImage
+from tqdm import tqdm
 
 
 def convertCSVToJSON(csv_path:str, json_path:str):
@@ -18,36 +22,56 @@ def convertCSVToJSON(csv_path:str, json_path:str):
 
 def cleanFaux():
     """ A function to clean the Fauxtography data for multimodal experiments"""
-    convertCSVToJSON("./data/datasets/faux/reuters.csv", "./data/datasets/faux/reuters.json")
-    with open("./data/datasets/faux/reuters.json", 'r', encoding='utf-8') as json_f:
-        reuters_json = json.load(json_f)
+    # convertCSVToJSON("./data/datasets/faux/reuters.csv", "./data/datasets/faux/reuters.json")
+    # with open("./data/datasets/faux/reuters.json", 'r', encoding='utf-8') as json_f:
+    #     reuters_json = json.load(json_f)
     
     convertCSVToJSON("./data/datasets/faux/snopes.csv", "./data/datasets/faux/snopes.json")
     with open("./data/datasets/faux/snopes.json", 'r', encoding='utf-8') as json_f:
         snopes_json = json.load(json_f)
 
     # Ensure there is not any missing value in claim, img_main, and label columns
-    reuters_json = [item for item in reuters_json if item.get('claim') and item.get('img_main') and item.get('label')]
+    # reuters_json = [item for item in reuters_json if item.get('claim') and item.get('img_main') and item.get('label')]
     snopes_json = [item for item in snopes_json if item.get('claim') and item.get('img_main') and item.get('label')]
 
     # Remove unnecessary keys and values from the dataset
-    reuters_json = [{key: value for key, value in item.items() if key in ['claim', 'img_main', 'label']} for item in reuters_json]
+    # reuters_json = [{key: value for key, value in item.items() if key in ['claim', 'img_main', 'label']} for item in reuters_json]
     snopes_json = [{key: value for key, value in item.items() if key in ['claim', 'img_main', 'label']} for item in snopes_json]
 
-    with open("./data/datasets/faux/reuters_processed.json", 'w', encoding='utf-8') as json_f:
-        json.dump(reuters_json, json_f, indent=2, ensure_ascii=False)
+    # with open("./data/datasets/faux/reuters_processed.json", 'w', encoding='utf-8') as json_f:
+    #     json.dump(reuters_json, json_f, indent=2, ensure_ascii=False)
 
     with open("./data/datasets/faux/snopes_processed.json", 'w', encoding='utf-8') as json_f:
         json.dump(snopes_json, json_f, indent=2, ensure_ascii=False)
     
     # Combine the 395 Reuters data and 838 Snopes data
-    combined_data = reuters_json + snopes_json
+    # combined_data = reuters_json + snopes_json
+
+    # Image downloading
+    updated_data = []
+
+    for idx, item in enumerate(tqdm(snopes_json, desc="Downloading Images")):
+
+        image_url = item["img_main"]
+        image_path = f"./data/datasets/faux/images/image_{idx}.jpg"
+
+        headers = {"User-Agent": "Mozilla/5.0"}
+
+        try:
+            res = requests.get(image_url,headers=headers)
+            res.raise_for_status()
+
+            with PILImage.open(BytesIO(res.content)) as img:
+                img.convert("RGB").save(image_path)
+            
+            item["img_main"] = image_path
+            updated_data.append(item)
+        except requests.exceptions.RequestException as e:
+            print("Image link is broken")
+            continue
 
     # Generate a Huggingface data
-    hf_data = Dataset.from_list(combined_data)
-
-    # Tell the img_main contains image paths
-    hf_data = hf_data.cast_column("img_main", Image())
+    hf_data = Dataset.from_list(updated_data)
 
     # Get class labels
     unique_labels = sorted(hf_data.unique("label"))

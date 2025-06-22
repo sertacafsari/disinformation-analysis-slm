@@ -58,7 +58,7 @@ set_seed(seed=seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Select dataset
-data_selector = DatasetSelection(dataset_name, model_name, batch_size)
+data_selector = DatasetSelection(dataset_name, model_name, batch_size, model_type)
 data, tokenizer, data_collator = data_selector.selectDataset()
 
 # Set the DataLoaders for train and validation data
@@ -88,6 +88,7 @@ test_dataloader = DataLoader(
 
 # Select the model
 model_selector = ModelSelection(model_name, model_type, dataset_name, tokenizer)
+print("Model is selected")
 
 learning_rates = [learning_rate]
 for lr in learning_rates:
@@ -117,12 +118,18 @@ for lr in learning_rates:
         model=model,
         lr=lr
     )
+    print(f"Model is being trained with the hp lr: {lr}")
 
     wandb.watch(model, log="all", log_freq=1)
+    
+    model.gradient_checkpointing_enable()
 
-    result = finetuner.train(device=device, epochs=epochs, logging_step=1, best_model_path=best_model_save_path, wandb_run=wandb)
+    if model_type == "text":
+        result = finetuner.train(device=device, epochs=epochs, logging_step=1, best_model_path=best_model_save_path, wandb_run=wandb)
+    else:
+        result = finetuner.vision_train(device=device, epochs=epochs, logging_step=1, gradient_acc_step=4, best_model_path=best_model_save_path, wandb_run=wandb)
 
-        # Print train losses
+    # Print train losses
     print(f"Training Losses: {result['train_loss']} \n")
     print(f"Validation Losses: {result['val_loss']} \n")
 
