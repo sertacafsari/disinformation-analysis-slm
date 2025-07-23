@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=digitallab
-#SBATCH --job-name=smolvision-run
-#SBATCH --time=08:00:00
+#SBATCH --job-name=smol-vision-run
+#SBATCH --time=10:00:00
 #SBATCH --output=smol-vision-faux%j.out
 #SBATCH --error=smol-vision-faux%j.err
 #SBATCH --gres=gpu:h100:1
@@ -23,7 +23,7 @@ python \
   --model_type vision \
   --dataset_name faux \
   --batch_size 8 \
-  --lr 7e-4 \
+  --lr 5e-6 \
 
 
 deactivate

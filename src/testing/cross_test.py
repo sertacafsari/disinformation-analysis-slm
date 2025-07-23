@@ -1,8 +1,7 @@
 from argparse import ArgumentParser
 from model_selection import ModelSelection
 from dataset_selection import DatasetSelection
-from finetuner import Finetuner
-from tester import Tester
+from testing.tester import Tester
 from dotenv import load_dotenv
 from huggingface_hub import login
 from torch.utils.data import DataLoader
@@ -65,12 +64,9 @@ model.to(device)
 print(f"Model is on {next(model.parameters()).device}\n")
 
 
-
-for step in range(3):
-
-    print(f"Testing {step+1}:")
-
-    seed = random.randint(1, 10000)
+counter = 0
+for seed in [42, 184, 346]:
+    print(f"Testing {counter+1}:")
     set_seed(seed=seed)
 
     # Set the DataLoaders for train and validation data
@@ -101,7 +97,7 @@ for step in range(3):
     wandb.init(
         entity="sbafsari-rug-university-of-groningen",
         project="disinformation-slm",
-        name=f"{dataset_name}-{model_name}-test-{step+1}",
+        name=f"{dataset_name}-{model_name}-test-{counter+1}",
         config={
             "model": model_name,
             "dataset": dataset_name,
@@ -110,7 +106,7 @@ for step in range(3):
         }
     )
     
-    best_model_save_path = f"./data/models/roberta_liar2/roberta_32_2e-05-last-1.pt"
+    best_model_save_path = f"./data/models/{model_name}/{model_name}_32_{learning_rate}.pt"
 
     model.load_state_dict(torch.load(best_model_save_path, map_location=device))
 
@@ -119,5 +115,7 @@ for step in range(3):
     tester = Tester(model=model, device=device, test_split=test_dataloader, logging_step=1, wandb_run=wandb)
 
     tester.testArgilla()
+
+    counter +=1
 
     wandb.finish()

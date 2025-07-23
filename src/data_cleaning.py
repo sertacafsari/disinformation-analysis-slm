@@ -22,31 +22,20 @@ def convertCSVToJSON(csv_path:str, json_path:str):
 
 def cleanFaux():
     """ A function to clean the Fauxtography data for multimodal experiments"""
-    # convertCSVToJSON("./data/datasets/faux/reuters.csv", "./data/datasets/faux/reuters.json")
-    # with open("./data/datasets/faux/reuters.json", 'r', encoding='utf-8') as json_f:
-    #     reuters_json = json.load(json_f)
     
     convertCSVToJSON("./data/datasets/faux/snopes.csv", "./data/datasets/faux/snopes.json")
     with open("./data/datasets/faux/snopes.json", 'r', encoding='utf-8') as json_f:
         snopes_json = json.load(json_f)
 
     # Ensure there is not any missing value in claim, img_main, and label columns
-    # reuters_json = [item for item in reuters_json if item.get('claim') and item.get('img_main') and item.get('label')]
     snopes_json = [item for item in snopes_json if item.get('claim') and item.get('img_main') and item.get('label')]
 
     # Remove unnecessary keys and values from the dataset
-    # reuters_json = [{key: value for key, value in item.items() if key in ['claim', 'img_main', 'label']} for item in reuters_json]
     snopes_json = [{key: value for key, value in item.items() if key in ['claim', 'img_main', 'label']} for item in snopes_json]
-
-    # with open("./data/datasets/faux/reuters_processed.json", 'w', encoding='utf-8') as json_f:
-    #     json.dump(reuters_json, json_f, indent=2, ensure_ascii=False)
 
     with open("./data/datasets/faux/snopes_processed.json", 'w', encoding='utf-8') as json_f:
         json.dump(snopes_json, json_f, indent=2, ensure_ascii=False)
     
-    # Combine the 395 Reuters data and 838 Snopes data
-    # combined_data = reuters_json + snopes_json
-
     # Image downloading
     updated_data = []
 

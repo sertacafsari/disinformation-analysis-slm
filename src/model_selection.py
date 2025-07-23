@@ -1,6 +1,5 @@
 from transformers import AutoConfig, AutoModelForSequenceClassification
-from classification import QwenVisionModelWithClassification, SmolVisionModel
-from torch.nn import Linear
+from classification_head import SmolVisionModelForClassification, CLIPForClassification, LlavaForClassification
 import torch
 
 def getTextModel(model_name:str):
@@ -15,16 +14,23 @@ def getTextModel(model_name:str):
         
 def getVisionModel(model_name:str):
     """ Returns the real name of the given model name"""
-    if model_name == "qwen":
-        return "Qwen/Qwen2.5-VL-3B-Instruct"
-    elif model_name == "microsoft":
-        return "microsoft/Florence-2-base"
+    if model_name == "clip":
+        return "openai/clip-vit-base-patch32"
     elif model_name == "smol":
         return "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+    elif model_name == "llava":
+        return "llava-hf/llava-onevision-qwen2-0.5b-si-hf"
     raise ValueError("No model or wrong model is provided for vision models")
 
 class ModelSelection():
-
+    """
+        A class to select models and change their configurations.
+        Params:
+            model_name(str): the name of the model.
+            model_type(str): the type of the model, which is either text or vision.
+            dataset_name(str): the name of the selected dataset.
+            tokenizer: used tokenizer.
+    """
     def __init__(self, model_name:str, model_type:str, dataset_name:str, tokenizer):
         
         self.type = model_type
@@ -36,7 +42,7 @@ class ModelSelection():
         else:
             raise ValueError("The model type is invalid!")
         
-        self.config = AutoConfig.from_pretrained(self.model_name)
+        self.config = AutoConfig.from_pretrained(self.model_name, trust_remote_code=True)
         self.dataset_name = dataset_name
         self.tokenizer = tokenizer
 
@@ -99,29 +105,24 @@ class ModelSelection():
 
         return model
     
-    def __configVisionQwen(self):
-        """ Config the Qwen2.5-VL model to desired and return it""" 
-
+    def __configClip(self):
+        """ Config the SmolLM2-VL model to desired and return it""" 
         # Config
-        self.config.num_labels = 3
-        self.config.id2label = {0: "true", 1: "false", 2: "mixed"}
-        self.config.label2id = {"true":0, "false": 1, "mixed":2}
+        self.config.num_labels = 2
+        self.config.id2label = {0: "true", 1: "false"}
+        self.config.label2id = {"true":0, "false": 1}
         self.config.use_cache = False
 
         if self.tokenizer.tokenizer.pad_token_id is not None:
             self.config.pad_token_id = self.tokenizer.tokenizer.pad_token_id
         
-        model = QwenVisionModelWithClassification.from_pretrained(self.model_name, config=self.config, torch_dtype=torch.bfloat16)
+        model = CLIPForClassification.from_pretrained(self.model_name, config=self.config, torch_dtype=torch.float32, class_weight=[0.76491646778, 0.23508353222])
 
-        model.vision_language_model.resize_token_embeddings(len(self.tokenizer.tokenizer))
+        model.config.vocab_size = len(self.tokenizer.tokenizer)
 
         return model
 
-        
 
-    # TODO
-    def __configFlorence():
-        pass
 
     def __configVisionSmol(self):
         """ Config the SmolLM2-VL model to desired and return it""" 
@@ -134,11 +135,13 @@ class ModelSelection():
         if self.tokenizer.tokenizer.pad_token_id is not None:
             self.config.pad_token_id = self.tokenizer.tokenizer.pad_token_id
         
-        model = SmolVisionModel.from_pretrained(self.model_name, config=self.config, torch_dtype=torch.bfloat16)
+        model = SmolVisionModelForClassification.from_pretrained(self.model_name, config=self.config, torch_dtype=torch.bfloat16)
 
         model.vision_language_model.resize_token_embeddings(len(self.tokenizer.tokenizer))
 
         return model
+
+
     def selectLanguageModel(self):
         """ Returns the language model with the selected config"""
         if self.type == "text":
@@ -150,12 +153,8 @@ class ModelSelection():
                 return self.__configQwen()
             raise ValueError("No text model is inputted!")
         elif self.type == "vision":
-            if "Qwen" in self.model_name:
-                return self.__configVisionQwen()
-            elif "Smol" in self.model_name:
+            if "Smol" in self.model_name:
                 return self.__configVisionSmol()
-            elif "Florence" in self.model_name:
-                return self.__configFlorence()
             raise ValueError("No vision model is inputted!")
         else:
             raise ValueError("The model type is invalid!")

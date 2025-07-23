@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from model_selection import ModelSelection
 from dataset_selection import DatasetSelection
 from finetuner import Finetuner
-from tester import Tester
+from testing.tester import Tester
 from dotenv import load_dotenv
 from huggingface_hub import login
 from torch.utils.data import DataLoader
@@ -98,8 +98,8 @@ for lr in learning_rates:
 
     wandb.init(
         entity="sbafsari-rug-university-of-groningen",
-        project="disinformation-slm",
-        name=f"{dataset_name}-{model_name}-{batch_size}-{lr}",
+        project="test-disinformation",
+        name=f"{dataset_name}-{model_name}-{batch_size}-{lr}-test-2",
         config={
             "model": model_name,
             "dataset": dataset_name,
@@ -110,7 +110,7 @@ for lr in learning_rates:
         }
     )
 
-    best_model_save_path = f"./data/models/{dataset_name}/{model_name}_{batch_size}_{lr}.pt"
+    best_model_save_path = f"./data/models/{model_name}/{model_name}_{batch_size}_{lr}-test-1.pt"
 
     finetuner = Finetuner(
         train_dataloader=train_dataloader,
@@ -118,7 +118,7 @@ for lr in learning_rates:
         model=model,
         lr=lr
     )
-    print(f"Model is being trained with the hp lr: {lr}")
+    print(f"Model is being trained with the lr: {lr}")
 
     wandb.watch(model, log="all", log_freq=1)
     

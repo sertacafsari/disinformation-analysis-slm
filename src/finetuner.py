@@ -13,8 +13,10 @@ class Finetuner():
     A class to fine tune the models with dis/misinformation datasets.
     
     Parameters:
-        train_dataloader(DataLoader):
-        val_dataloader(DataLoader):
+        train_dataloader(DataLoader): training set.
+        val_dataloader(DataLoader): validation set.
+        model(Module): the chosen language model.
+        lr(float): the learning rate.
     """
 
     def __init__(self, train_dataloader: DataLoader=None, val_dataloader:DataLoader=None,  model:Module=None, lr:float=0.0):
@@ -22,13 +24,21 @@ class Finetuner():
         self.model = model
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
-        if model.base_model_prefix == "roberta":
-            # Using weight decay to penalize large weights, standard 0.01 for AdamW in Roberta
-            self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.01)
-        else:
-            self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.1)
+        self.optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=0.01)
 
-    def train(self, device: torch.device, epochs:int=1, logging_step:int=10, best_model_path:str=None, wandb_run=None, k_top:int=2, patience:int=2):
+    def train(self, device: torch.device, epochs:int=1, logging_step:int=10, best_model_path:str=None, wandb_run=None, k_top:int=2, patience:int=5):
+        """
+            A training and validation loop for text classification models.
+
+            Parameters:
+                device(torch.device): the device.
+                epochs(int): number of epochs, default to 1.
+                logging_step(int): number of steps that the results will be logged. Default to 10.
+                best_model_path(str): the path to save the best performed model
+                wandb_run: Weights and Biases module. Only use if you log and save results in Weights and Biases.
+                k_top(int): The k value to calculate top-k accuracy.
+                patience(int): the patience value (OPTIONAL). Default to 5.
+        """
         # A variable to store the least validation loss (or best evaluation loss)
         # Set to infinity as we want to have the least one
         best_eval_loss = float('inf')
@@ -244,6 +254,18 @@ class Finetuner():
         return {"train_loss": train_losses,"val_loss": val_losses}
     
     def vision_train(self, device: torch.device, epochs:int=1, logging_step:int=10, gradient_acc_step:int =1, best_model_path:str=None, wandb_run=None, k_top:int=2):
+        """
+            A training and validation loop for vision language models.
+
+            Parameters:
+                device(torch.device): the device.
+                epochs(int): number of epochs, default to 1.
+                logging_step(int): number of steps that the results will be logged. Default to 10.
+                gradient_acc_step(int): the number of step to perform gradient accumulation. Defualt to 1.
+                best_model_path(str): the path to save the best performed model
+                wandb_run: Weights and Biases module. Only use if you log and save results in Weights and Biases.
+                k_top(int): The k value to calculate top-k accuracy.
+        """
         # A variable to store the least validation loss (or best evaluation loss)
         # Set to infinity as we want to have the least one
         best_eval_loss = float('inf')
@@ -286,8 +308,9 @@ class Finetuner():
                 attention_mask = batch_dict["attention_mask"].to(device)
                 pixel_values = batch_dict["pixel_values"].to(device)
                 pixel_values = pixel_values.to(self.model.dtype)
+                image_sizes = batch_dict["image_sizes"].to(device)
 
-                output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels, pixel_values=pixel_values)
+                output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels, pixel_values=pixel_values, image_sizes=image_sizes)
 
                 # Get the loss
                 loss = output["loss"]
@@ -382,9 +405,13 @@ class Finetuner():
                     attention_mask = batch_dict["attention_mask"].to(device)
                     pixel_values = batch_dict["pixel_values"].to(device)
                     pixel_values = pixel_values.to(self.model.dtype)
+                    image_sizes = batch_dict["image_sizes"].to(device)
 
-    
-                    output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels, pixel_values=pixel_values)
+                    print("\n--- Inspecting batch data before model call ---")
+                    print(f"Shape of input_ids: {input_ids.shape}")
+                    print(f"Shape of pixel_values: {pixel_values.shape}")
+
+                    output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels, pixel_values=pixel_values, image_sizes=image_sizes)
 
                     loss = output["loss"]
 

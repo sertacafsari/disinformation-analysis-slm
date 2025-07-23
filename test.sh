@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=digitallab
 #SBATCH --job-name=qwen-test-run
-#SBATCH --time=04:00:00
+#SBATCH --time=10:00:00
 #SBATCH --output=test-qwen-test-argilla%j.out
 #SBATCH --error=test-qwen-test-argilla%j.err
 #SBATCH --gres=gpu:h100:1
@@ -16,11 +16,11 @@ module load Python/3.11.5-GCCcore-13.2.0
 source .venv/bin/activate
 
 python \
-  src/cross.py \
+  src/testing/cross.py \
   --model_name qwen \
   --model_type text \
   --dataset_name argilla \
-  --batch_size 32 \
+  --batch_size 8 \
   --lr 5e-6 \
 
 

@@ -16,12 +16,12 @@ def getTextModel(model_name:str):
         
 def getVisionModel(model_name:str):
     """ Returns the real name of the given model name"""
-    if model_name == "qwen":
-        return "Qwen/Qwen2.5-VL-3B-Instruct"
-    elif model_name == "microsoft":
-        return "microsoft/Florence-2-base"
+    if model_name == "clip":
+        return "openai/clip-vit-large-patch14"
     elif model_name == "smol":
         return "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+    elif model_name == "llava":
+        return "llava-hf/llava-onevision-qwen2-0.5b-si-hf"
     raise ValueError("No model or wrong model is provided for vision models")
 
 
@@ -96,16 +96,9 @@ class DatasetSelection():
         self.batch_size = batch_size
     
     def __tokenizeTextData(self):
-        """Loads the chosen model's tokenizer, tokenize the selected dataset and save it to the disk
-        
-            Parameters:
-                model_name (str): The name of the model that will be used for Tokenizer
-                finetune_column (str): The column of data that will be used in finetuning. For this project, the columns will contain fake news, mis/disinformation.
-                save_data (bool (Optional)): A boolean value to decide whether the dataset will be saved or not.
-                save_data_path (str (Optional)): A path to save the dataset.
-            
-            Return:
-                dataset: The tokenized dataset
+        """
+            Loads the chosen model's tokenizer, tokenize the selected dataset.
+            Returns the tokenized dataset and tokenizer itself.
         """
         # Get the tokenizer
         tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -130,6 +123,10 @@ class DatasetSelection():
         return self.data, tokenizer
     
     def __processVisualData(self):
+        """ 
+            Tokenize texts and process images in the multi-modal dataset.
+            Returns the tokenized and processed data, processor (includes text tokenizer and image processor), and custom collator
+        """
 
         # Loads processor that includes a tokenizer for text and image processor
         processor = AutoProcessor.from_pretrained(self.model_name, trust_remote_code=True)
