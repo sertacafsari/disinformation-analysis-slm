@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
-from model_selection import ModelSelection
-from dataset_selection import DatasetSelection
+from model_configuration import ModelConfiguration
+from dataset_tokenization import DatasetTokenization
 from testing.tester import Tester
 from dotenv import load_dotenv
 from huggingface_hub import login
@@ -52,11 +52,11 @@ learning_rate = args.lr
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Select dataset
-data_selector = DatasetSelection(dataset_name, model_name, batch_size, model_type)
+data_selector = DatasetTokenization(dataset_name, model_name, batch_size, model_type)
 data, tokenizer, data_collator = data_selector.selectDataset()
 
 # Select model
-model_selector = ModelSelection(model_name, model_type, "liar2", tokenizer)
+model_selector = ModelConfiguration(model_name, model_type, "liar2", tokenizer)
 model = model_selector.selectLanguageModel()
 print("Model is selected")
 

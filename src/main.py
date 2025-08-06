@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
-from model_selection import ModelSelection
-from dataset_selection import DatasetSelection
+from model_configuration import ModelConfiguration
+from dataset_tokenization import DatasetTokenization
 from finetuner import Finetuner
 from testing.tester import Tester
 from dotenv import load_dotenv
@@ -58,7 +58,7 @@ set_seed(seed=seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Select dataset
-data_selector = DatasetSelection(dataset_name, model_name, batch_size, model_type)
+data_selector = DatasetTokenization(dataset_name, model_name, batch_size, model_type)
 data, tokenizer, data_collator = data_selector.selectDataset()
 
 # Set the DataLoaders for train and validation data
@@ -87,7 +87,7 @@ test_dataloader = DataLoader(
 )
 
 # Select the model
-model_selector = ModelSelection(model_name, model_type, dataset_name, tokenizer)
+model_selector = ModelConfiguration(model_name, model_type, dataset_name, tokenizer)
 print("Model is selected")
 
 learning_rates = [learning_rate]

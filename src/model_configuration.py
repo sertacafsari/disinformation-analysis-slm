@@ -22,7 +22,7 @@ def getVisionModel(model_name:str):
         return "llava-hf/llava-onevision-qwen2-0.5b-si-hf"
     raise ValueError("No model or wrong model is provided for vision models")
 
-class ModelSelection():
+class ModelConfiguration():
     """
         A class to select models and change their configurations.
         Params:

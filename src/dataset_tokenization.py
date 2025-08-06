@@ -85,7 +85,7 @@ def getData(dataset_name:str):
         return data, dataset_name, train_column
              
 
-class DatasetSelection():
+class DatasetTokenization():
 
     def __init__(self, dataset_name:str, model_name:str, batch_size:int, model_type:str):
         self.data, self.dataset_name, self.train_column = getData(dataset_name)
